@@ -1,0 +1,130 @@
+javascript:(function(){
+    if(document.getElementById('ios-offline-suite')) return;
+    
+    const wrapper = document.createElement('div');
+    wrapper.id = 'ios-offline-suite';
+    wrapper.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:999999;display:flex;justify-content:center;align-items:center;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;color:#fff;padding:12px;box-sizing:border-box;';
+    
+    wrapper.innerHTML = `
+        <div id="ios-main-card" style="background:#1c1c1e;border:1px solid #38383a;border-radius:20px;padding:16px;width:100%;max-width:460px;height:90vh;display:flex;flex-direction:column;gap:12px;box-shadow:0 10px 30px rgba(0,0,0,0.6);box-sizing:border-box;transition:all 0.3s ease;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+                <h2 style="font-size:1.2rem;margin:0;">Offline Suite & Viewer</h2>
+                <button id="ios-close" style="background:#3a3a3c;color:#fff;border:none;border-radius:50%;width:30px;height:30px;font-size:1rem;cursor:pointer;">&times;</button>
+            </div>
+            
+            <div style="display:flex;gap:6px;">
+                <select id="ios-saved-list" style="flex:1;background:#2c2c2e;color:#fff;border:1px solid #38383a;border-radius:8px;padding:8px;font-size:0.85rem;outline:none;">
+                    <option value="">-- Load Saved Bookmark --</option>
+                </select>
+                <button id="ios-load-btn" style="background:#3a3a3c;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:0.85rem;cursor:pointer;">Load</button>
+                <button id="ios-save-btn" style="background:#30d158;color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:0.85rem;font-weight:600;cursor:pointer;">Save</button>
+            </div>
+
+            <div style="display:flex;flex-direction:column;flex:1;gap:4px;">
+                <div style="font-size:0.75rem;color:#8e8e93;display:flex;justify-content:space-between;">
+                    <span>HTML / JS Code Editor</span>
+                    <button id="ios-run-btn" style="background:#0a84ff;color:#fff;border:none;border-radius:6px;padding:2px 10px;font-size:0.75rem;cursor:pointer;">Run Preview</button>
+                </div>
+                <textarea id="ios-editor" placeholder="Paste your HTML code here..." style="flex:1;background:#111;color:#fff;border:1px solid #38383a;border-radius:8px;padding:8px;font-family:monospace;font-size:0.8rem;resize:none;outline:none;"></textarea>
+            </div>
+
+            <div style="display:flex;flex-direction:column;flex:1;gap:4px;">
+                <div style="font-size:0.75rem;color:#8e8e93;display:flex;justify-content:space-between;">
+                    <span>Live Preview:</span>
+                    <button id="ios-fs-btn" style="background:#3a3a3c;color:#fff;border:none;border-radius:6px;padding:2px 10px;font-size:0.75rem;cursor:pointer;">⛶ Full Screen</button>
+                </div>
+                <iframe id="ios-frame" style="flex:1;background:#fff;border:none;border-radius:8px;width:100%;"></iframe>
+            </div>
+
+            <div style="font-size:0.7rem;color:#ff453a;text-align:center;padding-top:2px;">
+                ⚠️ Saved HTML only works with internet (Use Notes for offline backup)
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(wrapper);
+
+    const editor = document.getElementById('ios-editor');
+    const frame = document.getElementById('ios-frame');
+    const savedList = document.getElementById('ios-saved-list');
+    const mainCard = document.getElementById('ios-main-card');
+    const fsBtn = document.getElementById('ios-fs-btn');
+
+    let isFullscreen = false;
+
+    function updatePreview() {
+        const blob = new Blob([editor.value], { type: 'text/html' });
+        frame.src = URL.createObjectURL(blob);
+    }
+
+    function refreshDropdown() {
+        savedList.innerHTML = '<option value="">-- Load Saved Bookmark --</option>';
+        for (let i = 0; i < localStorage.length; i++) {
+            let key = localStorage.key(i);
+            if (key.startsWith('ios_app_')) {
+                let name = key.replace('ios_app_', '');
+                let opt = document.createElement('option');
+                opt.value = key;
+                opt.textContent = name;
+                savedList.appendChild(opt);
+            }
+        }
+    }
+
+    document.getElementById('ios-run-btn').addEventListener('click', updatePreview);
+
+    fsBtn.addEventListener('click', () => {
+        isFullscreen = !isFullscreen;
+        if (isFullscreen) {
+            mainCard.style.maxWidth = '100vw';
+            mainCard.style.height = '100vh';
+            mainCard.style.borderRadius = '0';
+            mainCard.style.padding = '8px';
+            document.getElementById('ios-editor').parentElement.style.display = 'none';
+            document.querySelector('div:has(> #ios-saved-list)').style.display = 'none';
+            mainCard.querySelector('h2').style.fontSize = '1rem';
+            fsBtn.textContent = '✕ Exit Full Screen';
+        } else {
+            mainCard.style.maxWidth = '460px';
+            mainCard.style.height = '90vh';
+            mainCard.style.borderRadius = '20px';
+            mainCard.style.padding = '16px';
+            document.getElementById('ios-editor').parentElement.style.display = 'flex';
+            document.querySelector('div:has(> #ios-saved-list)').style.display = 'flex';
+            mainCard.querySelector('h2').style.fontSize = '1.2rem';
+            fsBtn.textContent = '⛶ Full Screen';
+        }
+    });
+    
+    document.getElementById('ios-save-btn').addEventListener('click', () => {
+        let name = prompt("Enter a name for this app bookmark:");
+        if (name) {
+            localStorage.setItem('ios_app_' + name, editor.value);
+            refreshDropdown();
+            alert("Saved successfully!");
+        }
+    });
+
+    document.getElementById('ios-load-btn').addEventListener('click', () => {
+        let key = savedList.value;
+        if (key) {
+            editor.value = localStorage.getItem(key);
+            updatePreview();
+        }
+    });
+
+    document.getElementById('ios-close').addEventListener('click', () => {
+        document.body.removeChild(wrapper);
+    });
+
+    refreshDropdown();
+    editor.value = `<!DOCTYPE html>
+<html>
+<head><style>body{background:#000;color:#fff;padding:20px;font-family:sans-serif;text-align:center;}</style></head>
+<body>
+    <h2>Offline Suite Ready!</h2>
+    <p>Paste your code above and test it out.</p>
+</body>
+</html>`;
+    updatePreview();
+})();
