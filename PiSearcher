@@ -193,15 +193,16 @@
         </div>
 
         <div class="card">
-            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 6px;">Live Streamed Digits Preview:</div>
+            <div style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 6px;">Live Streaming Stream:</div>
             <div class="preview-box" id="previewBox">3.</div>
         </div>
     </div>
 
     <script>
         let piDigits = "3";
-        let currentIndex = 0;
-        const batchSize = 1500;
+        let totalCount = 1;
+        const maxMemoryBuffer = 40000; // Keeps memory lightweight and crash-proof
+        const batchSize = 200;
         
         const statsText = document.getElementById('statsText');
         const searchInput = document.getElementById('searchInput');
@@ -213,26 +214,31 @@
         let seedA = 1415926535;
         let seedB = 8979323846;
 
-        function generateMoreDigits(count) {
+        function backgroundLoop() {
+            // Generate a small chunk
             let chunk = "";
-            for (let i = 0; i < count; i++) {
+            for (let i = 0; i < batchSize; i++) {
                 seedA = (seedA * 16807) % 2147483647;
                 seedB = (seedB * 48271) % 2147483647;
                 let digit = (seedA + seedB) % 10;
                 chunk += digit;
             }
+            
+            totalCount += batchSize;
             piDigits += chunk;
-            currentIndex = piDigits.length;
-        }
 
-        function backgroundLoop() {
-            generateMoreDigits(batchSize);
-            statsText.textContent = `Generated: ${piDigits.length.toLocaleString()} digits`;
-            previewBox.textContent = "3." + piDigits.slice(1);
-            requestAnimationFrame(backgroundLoop);
-        }
+            // Rolling buffer trick: trim the front if it gets too large, preventing memory crashes
+            if (piDigits.length > maxMemoryBuffer) {
+                piDigits = piDigits.slice(piDigits.length - maxMemoryBuffer);
+            }
 
-        generateMoreDigits(10000);
+            statsText.textContent = `Generated: ${totalCount.toLocaleString()} digits`;
+            previewBox.textContent = "3." + piDigits.slice(-80); // Show the latest streaming digits
+            
+            setTimeout(() => {
+                requestAnimationFrame(backgroundLoop);
+            }, 50); // Controlled speed so it streams smoothly without choking the CPU
+        }
 
         function performSearch() {
             const query = searchInput.value.trim();
@@ -242,42 +248,37 @@
                 return;
             }
 
-            if (piDigits.length < 50000) {
-                generateMoreDigits(40000);
-            }
-
-            resultStatus.textContent = `Searching ${piDigits.length.toLocaleString()} digits...`;
+            resultStatus.textContent = `Searching recent active stream...`;
             matchList.innerHTML = "";
 
             let matches = [];
             let pos = piDigits.indexOf(query);
             
             while (pos !== -1 && matches.length < 5) {
-                matches.push(pos);
+                let absolutePos = totalCount - piDigits.length + pos;
+                matches.push({ pos: absolutePos, index: pos });
                 pos = piDigits.indexOf(query, pos + 1);
             }
 
             if (matches.length > 0) {
-                resultStatus.textContent = `Found ${matches.length}${matches.length === 5 ? '+' : ''} match(es)!`;
+                resultStatus.textContent = `Found ${matches.length} match(es) in active stream!`;
                 matches.forEach(m => {
-                    const startCtx = Math.max(0, m - 6);
-                    const endCtx = Math.min(piDigits.length, m + query.length + 6);
-                    const before = piDigits.substring(startCtx, m);
-                    const target = piDigits.substring(m, m + query.length);
-                    const after = piDigits.substring(m + query.length, endCtx);
+                    const startCtx = Math.max(0, m.index - 6);
+                    const endCtx = Math.min(piDigits.length, m.index + query.length + 6);
+                    const before = piDigits.substring(startCtx, m.index);
+                    const target = piDigits.substring(m.index, m.index + query.length);
+                    const after = piDigits.substring(m.index + query.index + query.length || m.index + query.length, endCtx);
 
                     const item = document.createElement('div');
                     item.className = 'match-item';
                     item.innerHTML = `
-                        <div class="match-pos">Decimal Position: #${m}</div>
+                        <div class="match-pos">Approx Position: #${m.pos}</div>
                         <div class="context-snippet">...${before}<span class="highlight">${target}</span>${after}...</div>
                     `;
                     matchList.appendChild(item);
                 });
             } else {
-                resultStatus.textContent = `No match found in current digits. Generating more...`;
-                generateMoreDigits(50000);
-                setTimeout(performSearch, 50);
+                resultStatus.textContent = `Searching... Keep generation running for more hits!`;
             }
         }
 
@@ -289,6 +290,7 @@
             }
         });
 
+        // Kick off the infinite safe generation loop
         requestAnimationFrame(backgroundLoop);
     </script>
 </body>
